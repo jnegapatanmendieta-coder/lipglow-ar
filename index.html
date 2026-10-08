@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>LipGlow · AR Lipstick Try-On & Shop</title>
+  <style>
+    :root {
+      --bg: #fff0f5;
+      --card: #ffffff;
+      --border: #f9c2d1;
+      --text: #4a2040;
+      --muted: #b07a8c;
+      --accent: #e91e63;
+      --accent-soft: rgba(233, 30, 99, 0.12);
+      --pink-light: #fce4ec;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(165deg, #fff0f5 0%, #ffe4ec 40%, #fce4ec 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+      padding-bottom: 80px;
+    }
+    header { width: 100%; max-width: 520px; padding: 16px 20px 8px; text-align: center; }
+    header h1 {
+      font-size: 1.55rem; font-weight: 800;
+      background: linear-gradient(90deg, #e91e63, #ad1457);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    header p { font-size: 0.78rem; color: var(--muted); margin-top: 3px; }
+    .badge {
+      display: inline-block; margin-top: 8px; font-size: 0.62rem; text-transform: uppercase;
+      letter-spacing: 0.07em; background: var(--accent-soft); color: var(--accent);
+      padding: 4px 12px; border-radius: 999px; font-weight: 600;
+    }
+    .stage-wrap { width: min(100vw, 480px); padding: 0 12px; }
+    .stage {
+      position: relative; width: 100%; aspect-ratio: 3/4; background: #2a1520;
+      border-radius: 24px; overflow: hidden;
+      box-shadow: 0 16px 48px rgba(233, 30, 99, 0.22); border: 3px solid #f8bbd0;
+    }
+    #video { position: absolute; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: none; }
+    #canvas { position: absolute; width: 100%; height: 100%; transform: scaleX(-1); }
+    .stage-overlay {
+      position: absolute; inset: 0; pointer-events: none; display: flex;
+      flex-direction: column; justify-content: space-between; padding: 14px;
+    }
+    .status-pill {
+      align-self: center; background: rgba(255, 240, 245, 0.92); backdrop-filter: blur(10px);
+      padding: 7px 16px; border-radius: 999px; font-size: 0.76rem; font-weight: 600;
+      color: var(--text); max-width: 92%; text-align: center;
+      box-shadow: 0 4px 14px rgba(233, 30, 99, 0.15);
+    }
+    .current-shade-tag {
+      align-self: flex-start; background: rgba(255, 240, 245, 0.95); padding: 7px 12px;
+      border-radius: 14px; font-size: 0.72rem; display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .current-shade-tag strong { color: var(--accent); }
+    .controls { width: min(100vw, 520px); padding: 14px 16px 20px; }
+    .brand-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; scrollbar-width: none; }
+    .brand-scroll::-webkit-scrollbar { display: none; }
+    .brand-tab {
+      flex-shrink: 0; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--border);
+      background: var(--card); color: var(--muted); font-size: 0.76rem; font-weight: 600;
+      cursor: pointer; white-space: nowrap;
+    }
+    .brand-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .search-row { margin-bottom: 12px; }
+    .search-row input {
+      width: 100%; padding: 12px 16px; border-radius: 14px; border: 1.5px solid var(--border);
+      background: var(--card); color: var(--text); font-size: 0.9rem; outline: none;
+    }
+    .shades-label {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
+      margin-bottom: 10px; display: flex; justify-content: space-between; font-weight: 600;
+    }
+    .shades-label span.count { color: var(--accent); }
+    .shade-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px; max-height: 280px; overflow-y: auto; margin-bottom: 6px;
+    }
+    .shade-card {
+      display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer;
+      padding: 10px 6px 8px; border-radius: 16px; border: 2px solid transparent;
+      background: var(--card); box-shadow: 0 3px 12px rgba(233, 30, 99, 0.08); text-align: center;
+    }
+    .shade-card.active { border-color: var(--accent); background: var(--pink-light); }
+    .swatch {
+      width: 42px; height: 42px; border-radius: 50%;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.15), inset 0 0 0 1px rgba(255,255,255,0.3);
+    }
+    .shade-meta .name { font-size: 0.68rem; font-weight: 700; color: var(--text);
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .shade-meta .brand { font-size: 0.58rem; color: var(--muted); }
+    .shade-meta .price { font-size: 0.72rem; font-weight: 700; color: var(--accent); margin-top: 3px; }
+    .add-btn {
+      margin-top: 4px; width: 100%; padding: 5px 0; border: none; border-radius: 10px;
+      background: var(--accent-soft); color: var(--accent); font-size: 0.68rem; font-weight: 700; cursor: pointer;
+    }
+    .slider-row { margin-top: 14px; display: flex; align-items: center; gap: 12px; }
+    .slider-row label { font-size: 0.78rem; color: var(--muted); min-width: 64px; font-weight: 600; }
+    input[type="range"] { flex: 1; -webkit-appearance: none; height: 6px; border-radius: 3px; background: #f8bbd0; outline: none; }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+      background: var(--accent); cursor: pointer; border: 2px solid #fff;
+    }
+    .btn-row { display: flex; gap: 10px; margin-top: 14px; }
+    button.action {
+      flex: 1; padding: 13px 10px; border: none; border-radius: 14px;
+      font-size: 0.88rem; font-weight: 700; cursor: pointer;
+    }
+    #startBtn { background: linear-gradient(135deg, #e91e63, #c2185b); color: #fff; }
+    #startBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #clearBtn, #snapBtn { background: var(--card); color: var(--text); border: 1.5px solid var(--border); }
+    #snapBtn { flex: 0.55; }
+    .hint { text-align: center; font-size: 0.7rem; color: var(--muted); margin-top: 14px; line-height: 1.45; }
+    .cart-fab {
+      position: fixed; bottom: 22px; right: 18px; width: 58px; height: 58px; border-radius: 50%;
+      background: linear-gradient(135deg, #e91e63, #ad1457); color: #fff; border: none;
+      box-shadow: 0 8px 24px rgba(233, 30, 99, 0.4); font-size: 1.4rem; cursor: pointer; z-index: 50;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cart-badge {
+      position: absolute; top: -2px; right: -2px; min-width: 22px; height: 22px; border-radius: 999px;
+      background: #fff; color: var(--accent); font-size: 0.7rem; font-weight: 800;
+      display: flex; align-items: center; justify-content: center; padding: 0 5px;
+      border: 2px solid var(--accent);
+    }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(74, 32, 64, 0.45); backdrop-filter: blur(4px);
+      z-index: 100; display: none; align-items: flex-end; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      width: min(100vw, 480px); max-height: 88vh; background: #fff;
+      border-radius: 28px 28px 0 0; padding: 20px 18px 28px; overflow-y: auto;
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .modal-header h2 { font-size: 1.2rem; font-weight: 800; }
+    .modal-close {
+      width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--pink-light);
+      color: var(--accent); font-size: 1.2rem; cursor: pointer;
+    }
+    .cart-item { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid #fce4ec; }
+    .swatch-sm { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; }
+    .cart-item-info { flex: 1; min-width: 0; }
+    .ci-name { font-size: 0.88rem; font-weight: 700; }
+    .ci-brand { font-size: 0.7rem; color: var(--muted); }
+    .ci-price { font-size: 0.82rem; font-weight: 700; color: var(--accent); }
+    .qty-row { display: flex; align-items: center; gap: 8px; }
+    .qty-btn {
+      width: 28px; height: 28px; border-radius: 8px; border: 1.5px solid var(--border);
+      background: #fff; font-size: 1rem; font-weight: 700; cursor: pointer;
+    }
+    .remove-btn { background: none; border: none; color: #e57373; font-size: 0.75rem; cursor: pointer; font-weight: 600; }
+    .cart-empty { text-align: center; padding: 36px 16px; color: var(--muted); }
+    .cart-summary { margin-top: 16px; padding: 14px 16px; background: var(--pink-light); border-radius: 16px; }
+    .summary-row { display: flex; justify-content: space-between; font-size: 0.88rem; margin-bottom: 6px; color: var(--muted); }
+    .summary-row.total { font-size: 1.05rem; font-weight: 800; color: var(--text); margin-top: 8px; padding-top: 8px; border-top: 1px dashed #f8bbd0; }
+    .summary-row.total span:last-child { color: var(--accent); }
+    .checkout-form label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--muted); margin: 10px 0 4px; }
+    .checkout-form input {
+      width: 100%; padding: 11px 14px; border-radius: 12px; border: 1.5px solid var(--border);
+      background: #fff; font-size: 0.9rem; color: var(--text); outline: none;
+    }
+    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pay-btn {
+      width: 100%; margin-top: 18px; padding: 15px; border: none; border-radius: 16px;
+      background: linear-gradient(135deg, #e91e63, #ad1457); color: #fff;
+      font-size: 1rem; font-weight: 800; cursor: pointer;
+    }
+    .success-view { text-align: center; padding: 28px 12px; display: none; }
+    .success-view .big-emoji { font-size: 3.2rem; margin-bottom: 10px; }
+    .success-view h3 { font-size: 1.25rem; font-weight: 800; margin-bottom: 6px; }
+    .success-view p { font-size: 0.88rem; color: var(--muted); margin-bottom: 18px; }
+    .order-id {
+      display: inline-block; background: var(--pink-light); color: var(--accent);
+      font-weight: 700; font-size: 0.82rem; padding: 6px 14px; border-radius: 999px; margin-bottom: 18px;
+    }
+    .done-btn {
+      width: 100%; padding: 14px; border: none; border-radius: 14px;
+      background: var(--accent); color: #fff; font-weight: 700; font-size: 0.95rem; cursor: pointer;
+    }
+    .toast {
+      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--text); color: #fff; padding: 10px 18px; border-radius: 999px;
+      font-size: 0.82rem; font-weight: 600; opacity: 0; transition: all 0.25s; z-index: 200; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>💕 LipGlow</h1>
+    <p>AR try-on · Shop your perfect shade</p>
+    <span class="badge">Prototype · Demo checkout</span>
+  </header>
+  <div class="stage-wrap">
+    <div class="stage">
+      <video id="video" playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div class="stage-overlay">
+        <div class="status-pill" id="status">Tap Start Camera to try shades ✨</div>
+        <div class="current-shade-tag" id="currentTag">
+          <strong id="tagName">—</strong><span id="tagBrand"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="controls">
+    <div class="brand-scroll" id="brandTabs"></div>
+    <div class="search-row">
+      <input type="search" id="search" placeholder="Search shade or brand… 🔍" autocomplete="off" />
+    </div>
+    <div class="shades-label"><span>Shades</span><span class="count" id="shadeCount">0</span></div>
+    <div class="shade-grid" id="shadeGrid"></div>
+    <div class="slider-row">
+      <label>Intensity</label>
+      <input type="range" id="intensity" min="0.18" max="0.82" step="0.01" value="0.48" />
+    </div>
+    <div class="btn-row">
+      <button class="action" id="startBtn">Start Camera</button>
+      <button class="action" id="clearBtn">Clear</button>
+      <button class="action" id="snapBtn" title="Save snapshot">📷</button>
+    </div>
+    <p class="hint">Try on → Add to cart → Checkout 💗<br>Demo store · No real payment · Runs in your browser</p>
+  </div>
+  <button class="cart-fab" id="cartFab" title="Open cart">🛒<span class="cart-badge" id="cartBadge" style="display:none">0</span></button>
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <div id="cartView">
+        <div class="modal-header"><h2>🛒 Your Cart</h2><button class="modal-close" id="closeModal">×</button></div>
+        <div id="cartItems"></div>
+        <div class="cart-summary" id="cartSummary" style="display:none">
+          <div class="summary-row"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
+          <div class="summary-row"><span>Shipping</span><span id="shipping">$4.99</span></div>
+          <div class="summary-row total"><span>Total</span><span id="total">$0.00</span></div>
+        </div>
+        <div class="checkout-form" id="checkoutForm" style="display:none">
+          <label>Full name</label><input type="text" id="cName" placeholder="Jane Doe" />
+          <label>Email</label><input type="email" id="cEmail" placeholder="jane@email.com" />
+          <label>Shipping address</label><input type="text" id="cAddress" placeholder="123 Rose Street" />
+          <div class="form-row-2">
+            <div><label>City</label><input type="text" id="cCity" placeholder="New York" /></div>
+            <div><label>ZIP</label><input type="text" id="cZip" placeholder="10001" /></div>
+          </div>
+          <label>Card number (demo)</label><input type="text" id="cCard" placeholder="4242 4242 4242 4242" maxlength="19" />
+          <div class="form-row-2">
+            <div><label>Expiry</label><input type="text" id="cExp" placeholder="12/28" maxlength="5" /></div>
+            <div><label>CVC</label><input type="text" id="cCvc" placeholder="123" maxlength="4" /></div>
+          </div>
+          <button class="pay-btn" id="payBtn">💕 Place Order</button>
+        </div>
+      </div>
+      <div class="success-view" id="successView">
+        <div class="big-emoji">🎉💗</div>
+        <h3>Order confirmed!</h3>
+        <p>Thanks for shopping LipGlow.<br>Your lipsticks are on the way ✨</p>
+        <div class="order-id" id="orderId">#LG-0000</div>
+        <button class="done-btn" id="doneBtn">Keep shopping</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+  <script>
+    const CATALOG = [
+      { id: "mac-ruby-woo", brand: "MAC", name: "Ruby Woo", color: "#C41E3A", price: 24 },
+      { id: "mac-chili", brand: "MAC", name: "Chili", color: "#B33A2E", price: 24 },
+      { id: "mac-velvet-teddy", brand: "MAC", name: "Velvet Teddy", color: "#A67B6A", price: 24 },
+      { id: "mac-whirl", brand: "MAC", name: "Whirl", color: "#8B6B63", price: 24 },
+      { id: "mac-mehr", brand: "MAC", name: "Mehr", color: "#C27B7A", price: 24 },
+      { id: "mac-russian-red", brand: "MAC", name: "Russian Red", color: "#A41E22", price: 24 },
+      { id: "mac-diva", brand: "MAC", name: "Diva", color: "#6B1E3A", price: 24 },
+      { id: "mac-lady-danger", brand: "MAC", name: "Lady Danger", color: "#E05A3C", price: 24 },
+      { id: "ct-pillow", brand: "Charlotte Tilbury", name: "Pillow Talk", color: "#C48B8B", price: 35 },
+      { id: "ct-pillow-med", brand: "Charlotte Tilbury", name: "Pillow Talk Medium", color: "#A66B6B", price: 35 },
+      { id: "ct-victoria", brand: "Charlotte Tilbury", name: "Very Victoria", color: "#B87A6E", price: 35 },
+      { id: "ct-bond", brand: "Charlotte Tilbury", name: "Bond Girl", color: "#8B3A3A", price: 35 },
+      { id: "ct-red-carpet", brand: "Charlotte Tilbury", name: "Red Carpet Red", color: "#C41E2A", price: 35 },
+      { id: "nars-dolce", brand: "NARS", name: "Dolce Vita", color: "#C47A6A", price: 28 },
+      { id: "nars-cruella", brand: "NARS", name: "Cruella", color: "#9B1A2A", price: 28 },
+      { id: "nars-morocco", brand: "NARS", name: "Morocco", color: "#A65A3A", price: 28 },
+      { id: "nars-heat", brand: "NARS", name: "Heat Wave", color: "#E05A3A", price: 28 },
+      { id: "fenty-uncensored", brand: "Fenty Beauty", name: "Stunna - Uncensored", color: "#B81E2A", price: 26 },
+      { id: "fenty-mvp", brand: "Fenty Beauty", name: "Stunna - The MVP", color: "#9B1A2A", price: 26 },
+      { id: "fenty-glow", brand: "Fenty Beauty", name: "Gloss Bomb - Fenty Glow", color: "#E8A090", price: 22 },
+      { id: "mb-pioneer", brand: "Maybelline", name: "SuperStay Pioneer", color: "#C41E3A", price: 11.99 },
+      { id: "mb-ringleader", brand: "Maybelline", name: "SuperStay Ringleader", color: "#9B1A2A", price: 11.99 },
+      { id: "mb-nude", brand: "Maybelline", name: "Nude Nuance", color: "#C49A8A", price: 8.99 },
+      { id: "dior-999", brand: "Dior", name: "Rouge Dior 999", color: "#C41E2A", price: 42 },
+      { id: "dior-100", brand: "Dior", name: "Rouge Dior 100 Nude", color: "#C49A8A", price: 42 },
+      { id: "ysl-1", brand: "YSL", name: "Rouge Pur Couture 1", color: "#C41E3A", price: 42 },
+      { id: "rare-encourage", brand: "Rare Beauty", name: "Soft Pinch - Encourage", color: "#C47A7A", price: 20 },
+      { id: "pm-elson", brand: "Pat McGrath", name: "MatteTrance - Elson 2", color: "#B82A4A", price: 38 },
+      { id: "huda-trophy", brand: "Huda Beauty", name: "Liquid Matte - Trophy Wife", color: "#C41E5A", price: 22 },
+      { id: "cli-honey", brand: "Clinique", name: "Black Honey", color: "#6B3A4A", price: 22 },
+      { id: "elf-ovation", brand: "e.l.f.", name: "Standing Ovation", color: "#C47A7A", price: 9 },
+      { id: "rev-cherries", brand: "Revlon", name: "Cherries in the Snow", color: "#C41E3A", price: 9.49 }
+    ];
+    const LIP_OUTER = [61,185,40,39,37,0,267,269,270,409,291,375,321,405,314,17,84,181,91,146];
+    let currentShade = null, intensity = 0.48, activeBrand = "All", camera = null, faceMesh = null, searchQuery = "", cart = [], mediaStream = null;
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const statusEl = document.getElementById("status");
+    const intensitySlider = document.getElementById("intensity");
+    const startBtn = document.getElementById("startBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const snapBtn = document.getElementById("snapBtn");
+    const shadeGrid = document.getElementById("shadeGrid");
+    const brandTabs = document.getElementById("brandTabs");
+    const searchInput = document.getElementById("search");
+    const shadeCount = document.getElementById("shadeCount");
+    const currentTag = document.getElementById("currentTag");
+    const tagName = document.getElementById("tagName");
+    const tagBrand = document.getElementById("tagBrand");
+    const cartFab = document.getElementById("cartFab");
+    const cartBadge = document.getElementById("cartBadge");
+    const modal = document.getElementById("modal");
+    const closeModal = document.getElementById("closeModal");
+    const cartItems = document.getElementById("cartItems");
+    const cartSummary = document.getElementById("cartSummary");
+    const checkoutForm = document.getElementById("checkoutForm");
+    const cartView = document.getElementById("cartView");
+    const successView = document.getElementById("successView");
+    const payBtn = document.getElementById("payBtn");
+    const doneBtn = document.getElementById("doneBtn");
+    const toast = document.getElementById("toast");
+    const brands = ["All", ...new Set(CATALOG.map(s => s.brand))];
+    function money(n) { return "$" + Number(n).toFixed(2); }
+    function showToast(msg) {
+      toast.textContent = msg; toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+    function cartCount() { return cart.reduce((s, i) => s + i.qty, 0); }
+    function updateBadge() {
+      const n = cartCount();
+      if (n > 0) { cartBadge.style.display = "flex"; cartBadge.textContent = n > 99 ? "99+" : n; }
+      else cartBadge.style.display = "none";
+    }
+    function addToCart(product, e) {
+      if (e) e.stopPropagation();
+      const existing = cart.find(i => i.id === product.id);
+      if (existing) existing.qty += 1; else cart.push({ id: product.id, qty: 1 });
+      updateBadge(); showToast("Added " + product.name + " 💕");
+    }
+    function setQty(id, delta) {
+      const item = cart.find(i => i.id === id); if (!item) return;
+      item.qty += delta; if (item.qty <= 0) cart = cart.filter(i => i.id !== id);
+      renderCart(); updateBadge();
+    }
+    function removeItem(id) { cart = cart.filter(i => i.id !== id); renderCart(); updateBadge(); }
+    function renderCart() {
+      if (cart.length === 0) {
+        cartItems.innerHTML = '<div class="cart-empty"><div style="font-size:2.4rem">🛍️</div><div>Your cart is empty</div></div>';
+        cartSummary.style.display = "none"; checkoutForm.style.display = "none"; return;
+      }
+      let html = "", sub = 0;
+      cart.forEach(ci => {
+        const p = CATALOG.find(x => x.id === ci.id); if (!p) return;
+        sub += p.price * ci.qty;
+        html += `<div class="cart-item"><div class="swatch-sm" style="background:${p.color}"></div><div class="cart-item-info"><div class="ci-name">${p.name}</div><div class="ci-brand">${p.brand}</div><div class="ci-price">${money(p.price)}</div><button class="remove-btn" onclick="removeItem('${p.id}')">Remove</button></div><div class="qty-row"><button class="qty-btn" onclick="setQty('${p.id}',-1)">−</button><span>${ci.qty}</span><button class="qty-btn" onclick="setQty('${p.id}',1)">+</button></div></div>`;
+      });
+      cartItems.innerHTML = html;
+      const ship = sub >= 50 ? 0 : 4.99;
+      document.getElementById("subtotal").textContent = money(sub);
+      document.getElementById("shipping").textContent = ship === 0 ? "FREE 🎉" : money(ship);
+      document.getElementById("total").textContent = money(sub + ship);
+      cartSummary.style.display = "block"; checkoutForm.style.display = "block";
+    }
+    function openCart() { cartView.style.display = "block"; successView.style.display = "none"; renderCart(); modal.classList.add("open"); }
+    function closeCart() { modal.classList.remove("open"); }
+    cartFab.addEventListener("click", openCart);
+    closeModal.addEventListener("click", closeCart);
+    modal.addEventListener("click", e => { if (e.target === modal) closeCart(); });
+    payBtn.addEventListener("click", () => {
+      if (cart.length === 0) return;
+      const name = document.getElementById("cName").value.trim();
+      const email = document.getElementById("cEmail").value.trim();
+      if (!name || !email) { showToast("Please fill name & email 💕"); return; }
+      document.getElementById("orderId").textContent = "#LG-" + Math.floor(10000 + Math.random() * 90000);
+      cartView.style.display = "none"; successView.style.display = "block";
+      cart = []; updateBadge();
+    });
+    doneBtn.addEventListener("click", () => { closeCart(); ["cName","cEmail","cAddress","cCity","cZip","cCard","cExp","cCvc"].forEach(id => document.getElementById(id).value = ""); });
+    window.setQty = setQty; window.removeItem = removeItem;
+    function renderBrandTabs() {
+      brandTabs.innerHTML = "";
+      brands.forEach(b => {
+        const btn = document.createElement("button");
+        btn.className = "brand-tab" + (b === activeBrand ? " active" : "");
+        btn.textContent = b;
+        btn.onclick = () => { activeBrand = b; renderBrandTabs(); renderShades(); };
+        brandTabs.appendChild(btn);
+      });
+    }
+    function getFiltered() {
+      let list = CATALOG;
+      if (activeBrand !== "All") list = list.filter(s => s.brand === activeBrand);
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        list = list.filter(s => s.name.toLowerCase().includes(q) || s.brand.toLowerCase().includes(q));
+      }
+      return list;
+    }
+    function renderShades() {
+      const list = getFiltered();
+      shadeCount.textContent = list.length;
+      shadeGrid.innerHTML = "";
+      if (!list.length) { shadeGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px;color:#b07a8c">No shades match 💔</div>'; return; }
+      list.forEach(s => {
+        const card = document.createElement("div");
+        card.className = "shade-card" + (currentShade === s ? " active" : "");
+        card.innerHTML = `<div class="swatch" style="background:${s.color}"></div><div class="shade-meta"><div class="name">${s.name}</div><div class="brand">${s.brand}</div><div class="price">${money(s.price)}</div></div><button class="add-btn">+ Cart</button>`;
+        card.onclick = e => { if (e.target.classList.contains("add-btn")) return; selectShade(s); };
+        card.querySelector(".add-btn").onclick = e => addToCart(s, e);
+        shadeGrid.appendChild(card);
+      });
+    }
+    function selectShade(s) {
+      currentShade = s;
+      tagName.textContent = s.name;
+      tagBrand.textContent = " · " + s.brand + " · " + money(s.price);
+      currentTag.style.display = "block";
+      statusEl.textContent = s.name + " · " + s.brand;
+      renderShades();
+    }
+    intensitySlider.oninput = () => { intensity = parseFloat(intensitySlider.value); };
+    searchInput.oninput = () => { searchQuery = searchInput.value; renderShades(); };
+    clearBtn.onclick = () => {
+      currentShade = null; currentTag.style.display = "none";
+      statusEl.textContent = camera ? "Face the camera ✨" : "Tap Start Camera to try shades ✨";
+      renderShades();
+    };
+    snapBtn.onclick = () => {
+      if (!canvas.width) return;
+      const a = document.createElement("a");
+      a.download = "lipglow-tryon-" + Date.now() + ".png";
+      a.href = canvas.toDataURL("image/png"); a.click();
+    };
+    function drawLips(landmarks, w, h) {
+      if (!currentShade) return;
+      const pt = i => ({ x: landmarks[i].x * w, y: landmarks[i].y * h });
+      ctx.save(); ctx.globalAlpha = intensity;
+      ctx.beginPath();
+      const first = pt(LIP_OUTER[0]); ctx.moveTo(first.x, first.y);
+      for (let i = 1; i < LIP_OUTER.length; i++) { const p = pt(LIP_OUTER[i]); ctx.lineTo(p.x, p.y); }
+      ctx.closePath(); ctx.fillStyle = currentShade.color; ctx.fill();
+      ctx.globalAlpha = intensity * 0.32; ctx.lineWidth = 5; ctx.strokeStyle = currentShade.color; ctx.lineJoin = "round"; ctx.stroke();
+      ctx.restore();
+    }
+    function onResults(results) {
+      const w = video.videoWidth || 640, h = video.videoHeight || 480;
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+      ctx.save(); ctx.clearRect(0, 0, w, h); ctx.drawImage(results.image, 0, 0, w, h);
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length) {
+        drawLips(results.multiFaceLandmarks[0], w, h);
+        if (!currentShade && statusEl.textContent.includes("Looking")) statusEl.textContent = "Face detected · pick a shade 💕";
+      } else if (camera) statusEl.textContent = "Looking for face…";
+      ctx.restore();
+    }
+    async function requestCameraStream() {
+      if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
+        throw new Error("Camera API not supported. Try Chrome or Edge.");
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: { ideal: "user" }, width: { ideal: 1280, min: 640 }, height: { ideal: 720, min: 480 }, frameRate: { ideal: 30 } }
+        });
+      } catch (e) {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: "user" } });
+      }
+      video.srcObject = mediaStream; video.setAttribute("playsinline", "true"); video.muted = true;
+      await video.play(); return mediaStream;
+    }
+    async function startCamera() {
+      startBtn.disabled = true; statusEl.textContent = "Requesting camera permission…";
+      try {
+        await requestCameraStream(); statusEl.textContent = "Loading face model…";
+        faceMesh = new FaceMesh({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${f}` });
+        faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        faceMesh.onResults(onResults);
+        camera = new Camera(video, {
+          onFrame: async () => { if (video.readyState >= 2) await faceMesh.send({ image: video }); },
+          width: video.videoWidth || 640, height: video.videoHeight || 480
+        });
+        await camera.start(); video.style.display = "none";
+        statusEl.textContent = "Front camera on · pick a shade 💕";
+        startBtn.textContent = "Camera On"; showToast("Camera connected 📷");
+      } catch (err) {
+        console.error(err);
+        let msg = "Camera error";
+        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") msg = "Camera permission denied — allow camera in browser settings";
+        else if (err.name === "NotFoundError") msg = "No camera found on this device";
+        else if (err.name === "NotReadableError") msg = "Camera is in use by another app";
+        else if (err.message) msg = err.message;
+        statusEl.textContent = msg; startBtn.disabled = false; startBtn.textContent = "Retry Camera"; camera = null;
+      }
+    }
+    startBtn.onclick = () => { if (!camera) startCamera(); };
+    renderBrandTabs(); renderShades(); updateBadge();
+  </script>
+</body>
+</html>
